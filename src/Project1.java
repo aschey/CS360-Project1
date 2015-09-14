@@ -26,7 +26,10 @@ public class Project1 {
 }
 
 class Person implements Comparator<Person>, Comparable<Person> {
-    public static SortData compareType = SortData.BIRTH_DATE;
+    private static final int BIRTHDAY_LENGTH = 8;
+    private static final int SSN_LENGTH = 9;
+    private static SortData compareType = SortData.BIRTH_DATE;
+    private static int compareLength = BIRTHDAY_LENGTH;
     public String lastName;
     public String SSN;
     public String birthDate;
@@ -37,26 +40,50 @@ class Person implements Comparator<Person>, Comparable<Person> {
         this.SSN = SSN;
         this.birthDate = birthDate;
         if (Person.compareType == SortData.BIRTH_DATE) {
-            String reorderedBirthDate = birthDate.substring(4) + birthDate.substring(0,4);
-            this.compareValue = Integer.parseInt(reorderedBirthDate);
+            this.compareValue = Integer.parseInt(birthDate);
         }
         else {
             this.compareValue = Integer.parseInt(SSN.replace("-", ""));
         }
     }
 
-    public int getCompareValue() {
-        return compareValue;
+    public void setCompareType(SortData compare) {
+        compareType = compare;
+        if (compare == SortData.BIRTH_DATE) {
+            compareLength = BIRTHDAY_LENGTH;
+        }
+        else {
+            compareLength = SSN_LENGTH;
+        }
     }
+
+    //public int getCompareLength() {
+    //    return compareLength;
+    //}
+
+    public int getCompareValue(int start, int end) {
+        int intSlice = this.compareValue % (int)Math.pow(10, compareLength - start);
+        intSlice /= (int)Math.pow(10, compareLength - end);
+        return intSlice;
+    }
+
+    //public int getCompareValueAsInt() {
+    //    return Integer.parseInt(this.compareValue);
+    //}
+
+//    public int getCompareValueAsInt(int start, int end) {
+//        String compareSubstring = this.compareValue.substring(start, end);
+//        return Integer.parseInt(compareSubstring);
+//    }
 
     @Override
     public int compareTo(Person p) {
-        return Integer.compare(this.compareValue, p.compareValue);
+        return this.compareValue.compareTo(p.compareValue);
     }
 
     @Override
     public int compare(Person p1, Person p2) {
-        return Integer.compare(p1.compareValue, p2.compareValue);
+        return p1.compareValue.compareTo(p2.compareValue);
     }
 
     @Override
@@ -151,8 +178,8 @@ class Sort {
     }
 
     public void runSorts() {
-        this.runSort(SortType.QUICKSORT);
-        //this.runSort(SortType.RADIX_SORT);
+        //this.runSort(SortType.QUICKSORT);
+        this.runSort(SortType.RADIX_SORT);
     }
 
     private void runSort(SortType sortType) {
@@ -165,28 +192,29 @@ class Sort {
         for (int currentNumRecords = interval; currentNumRecords <= this.numRecords; currentNumRecords += interval) {
             this.numComparisons = 0;
             this.numAssignments = 0;
-            sortArray = this.deepCopy(this.unsortedData, currentNumRecords);
+            sortArray = this.deepCopy(this.unsortedData, 0, currentNumRecords);
             //System.out.println(Arrays.deepToString(sortArray));
             if (sortType == SortType.QUICKSORT) {
                 this.quickSort(sortArray);
             }
             else {
-                this.radixSort();
+                this.radixSort(sortArray);
             }
             comparisons[sortDataIndex] = this.numComparisons;
             assignments[sortDataIndex++] = this.numAssignments;
-            if (!this.testCorrectness(sortArray)) {
-                this.exitWithError("Not sorted");
-            }
+//            if (!this.testCorrectness(sortArray)) {
+//                this.exitWithError("Not sorted");
+//            }
             //this.printResults(sortArray, assignments, comparisons, "Quicksort");
         }
-        this.printResults(sortArray, assignments, comparisons, "Quicksort");
+        //this.printResults(sortArray, assignments, comparisons, "Quicksort");
+        this.printResults(sortArray, assignments, comparisons, "Radix Sort");
     }
 
-    private Person[] deepCopy(Person[] copyArray, int numRecords) {
+    private Person[] deepCopy(Person[] copyArray, int start, int numRecords) {
         Person[] newArray = new Person[numRecords];
         for (int i = 0; i < numRecords; i++) {
-            newArray[i] = copyArray[i];
+            newArray[i] = copyArray[i + start];
         }
         return newArray;
     }
@@ -201,7 +229,7 @@ class Sort {
         return true;
     }
 
-    private void printResults(Person[] sortedArray, int[] assignments, int[] comparisons, String sortTitle) {
+    private void printResults(Person[] sortedArray, int arrayLength, int[] assignments, int[] comparisons, String sortTitle) {
         System.out.println(sortTitle);
         System.out.println("- Sorted array");
 
@@ -267,46 +295,79 @@ class Sort {
         return i;
     }
 
-    public void radixSort() {
-
+    public void radixSort(Person[] sortArray, int arrayLength) {
+        int partitionLength = this.choosePartitionLength(arrayLength);
+        int firstStart = arrayLength - partitionLength - 1;
+        for (int start = firstStart; start >= (-1 * partitionLength + 1); start -= partitionLength) {
+            int checkedStart;
+            int end = start + partitionLength;
+            if (start < 0) {
+                checkedStart = 0;
+                //System.out.println(subarraySize);
+            }
+            else {
+                checkedStart = start;
+            }
+            this.countingSort(sortArray, arrayLength, checkedStart, end);
+        }
     }
 
-    private Person[] countingSort(Person[] unsorted) {
-        int maxValue = this.getMaxPersonValue();
-        int[] helper = new int[maxValue];
-        Person[] sorted = new Person[unsorted.length];
+    private int choosePartitionLength(int arraySize) {
+        final double NUM_BITS = 32.0;
+        double lgn = Math.floor(Math.log(arraySize) / Math.log(2));
+        double partitionSize = (NUM_BITS < lgn) ? NUM_BITS : lgn;
+        int partitionLength = (int)Math.ceil(NUM_BITS / partitionSize);
+        if (partitionLength < 1) {
+            partitionLength = 1;
+        }
+        return partitionLength;
+    }
+
+    private Person[] countingSort(Person[] unsorted, int arrayLength, int start, int end) {
+        int maxValue = this.getMaxPersonValue(unsorted, start, arrayLength);
+        int[] helper = new int[maxValue + 1];
+
+        Person[] sorted = new Person[arrayLength];
 
         for (int i = 0; i <= maxValue; i++) {
+            this.numAssignments++;
             helper[i] = 0;
         }
 
         for (int i = 0; i < unsorted.length; i++) {
-            helper[unsorted[i].getCompareValue()]++;
+            this.numAssignments++;
+            helper[unsorted[i].getCompareValue(start, end)]++;
         }
 
-        for (int i = 1; i <= maxValue; i++) {
+        for (int i = 1; i < helper.length; i++) {
+            this.numAssignments++;
             helper[i] += helper[i - 1];
         }
 
-        for (int i = 0; i < unsorted.length; i++) {
+        for (int i = unsorted.length - 1; i >= 0; i--) {
             Person p = unsorted[i];
-            int value = p.getCompareValue();
-            sorted[helper[value]] = p;
+            int value = p.getCompareValue(start, end);
+            this.numAssignments++;
+            //System.out.println(helper[value]);
+            //System.out.println(sorted.length);
+            sorted[helper[value]-1] = p;
+            this.numAssignments++;
             helper[value]--;
         }
 
         return sorted;
     }
 
-    private int getMaxPersonValue() {
-        //return Arrays.stream(this.unsortedData).max(Comparator.<Person>naturalOrder()).get().getCompareValue();
+    private int getMaxPersonValue(Person[] array, int start, int end) {
         int maxValue = 0;
-        for (int i = 0; i < this.unsortedData.length; i++) {
-            int compareValue = this.unsortedData[i].getCompareValue();
+        for (int i = 0; i < array.length; i++) {
+            int compareValue = array[i].getCompareValue(start, end);
             if (compareValue > maxValue) {
                 maxValue = compareValue;
             }
         }
         return maxValue;
     }
+
+
 }
