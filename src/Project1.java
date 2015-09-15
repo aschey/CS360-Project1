@@ -12,8 +12,19 @@ enum SortData {
 }
 
 enum SortType {
-    QUICKSORT,
-    RADIX_SORT
+    QUICKSORT("Quicksort"),
+    RADIX_SORT("Radix Sort");
+
+    private final String text;
+
+    private SortType(final String text) {
+        this.text = text;
+    }
+
+    @Override
+    public String toString() {
+        return text;
+    }
 }
 
 public class Project1 {
@@ -25,7 +36,7 @@ public class Project1 {
     }
 }
 
-class Person implements Comparator<Person>, Comparable<Person> {
+class Person {
     private static final int BIRTHDAY_LENGTH = 8;
     private static final int SSN_LENGTH = 9;
     private static SortData compareType = SortData.BIRTH_DATE;
@@ -47,7 +58,7 @@ class Person implements Comparator<Person>, Comparable<Person> {
         }
     }
 
-    public void setCompareType(SortData compare) {
+    public static void setCompareType(SortData compare) {
         compareType = compare;
         if (compare == SortData.BIRTH_DATE) {
             compareLength = BIRTHDAY_LENGTH;
@@ -57,33 +68,19 @@ class Person implements Comparator<Person>, Comparable<Person> {
         }
     }
 
-    //public int getCompareLength() {
-    //    return compareLength;
-    //}
+    public static int getCompareLength() {
+        return compareLength;
+    }
 
     public int getCompareValue(int start, int end) {
         int intSlice = this.compareValue % (int)Math.pow(10, compareLength - start);
         intSlice /= (int)Math.pow(10, compareLength - end);
+        //System.out.println(this.compareValue + " " + start + " " + end + " " + intSlice);
         return intSlice;
     }
 
-    //public int getCompareValueAsInt() {
-    //    return Integer.parseInt(this.compareValue);
-    //}
-
-//    public int getCompareValueAsInt(int start, int end) {
-//        String compareSubstring = this.compareValue.substring(start, end);
-//        return Integer.parseInt(compareSubstring);
-//    }
-
-    @Override
-    public int compareTo(Person p) {
-        return this.compareValue.compareTo(p.compareValue);
-    }
-
-    @Override
-    public int compare(Person p1, Person p2) {
-        return p1.compareValue.compareTo(p2.compareValue);
+    public int getCompareValue() {
+        return this.compareValue;
     }
 
     @Override
@@ -95,7 +92,7 @@ class Person implements Comparator<Person>, Comparable<Person> {
         String month = this.birthDate.substring(0, 2);
         String day = this.birthDate.substring(2, 4);
         String year = this.birthDate.substring(4);
-        return String.join("/", month, day, year);
+        return month + "/" + day + "/" + year;
     }
 }
 
@@ -116,14 +113,27 @@ class Sort {
         System.exit(0);
     }
 
+    private int getArgsLength(String[] args) {
+        int length = 0;
+        while (true) {
+            try {
+                length++;
+                String s = args[length];
+            }
+            catch (ArrayIndexOutOfBoundsException ex) {
+                return length;
+            }
+        }
+    }
+
     private void swap(Person[] array, int swapIndex1, int swapIndex2) {
         Person temp = array[swapIndex1];
         array[swapIndex1] = array[swapIndex2];
         array[swapIndex2] = temp;
     }
 
-    private int indexOf(String[] array, String value) {
-        for (int i = 0; i < array.length; i++) {
+    private int indexOf(String[] array, String value, int arrayLength) {
+        for (int i = 0; i < arrayLength; i++) {
             if (array[i].equals(value)) {
                 return i;
             }
@@ -132,21 +142,22 @@ class Sort {
     }
 
     public void parseArgs(String[] args) {
-        if (this.indexOf(args, "-B") > -1) {
-            Person.compareType = SortData.BIRTH_DATE;
+        int argsLength = this.getArgsLength(args);
+        if (this.indexOf(args, "-B", argsLength) > -1) {
+            Person.setCompareType(SortData.BIRTH_DATE);
         }
-        else if (this.indexOf(args, "-S") > -1) {
-            Person.compareType = SortData.SSN;
+        else if (this.indexOf(args, "-S", argsLength) > -1) {
+            Person.setCompareType(SortData.SSN);
         }
         else {
             this.exitWithError("Sort type not specified");
         }
 
-        int numIterationsIndex = this.indexOf(args, "-n");
+        int numIterationsIndex = this.indexOf(args, "-n", argsLength);
         if (numIterationsIndex < 0) {
             this.exitWithError("Number of iterations flag missing");
         }
-        if (numIterationsIndex == (args.length - 1)) {
+        if (numIterationsIndex == (argsLength - 1)) {
             this.exitWithError("Number of iterations value missing");
         }
 
@@ -178,7 +189,7 @@ class Sort {
     }
 
     public void runSorts() {
-        //this.runSort(SortType.QUICKSORT);
+        this.runSort(SortType.QUICKSORT);
         this.runSort(SortType.RADIX_SORT);
     }
 
@@ -195,20 +206,20 @@ class Sort {
             sortArray = this.deepCopy(this.unsortedData, 0, currentNumRecords);
             //System.out.println(Arrays.deepToString(sortArray));
             if (sortType == SortType.QUICKSORT) {
-                this.quickSort(sortArray);
+                this.quickSort(sortArray, currentNumRecords);
             }
             else {
-                this.radixSort(sortArray);
+                sortArray = this.radixSort(sortArray, currentNumRecords);
             }
             comparisons[sortDataIndex] = this.numComparisons;
             assignments[sortDataIndex++] = this.numAssignments;
-//            if (!this.testCorrectness(sortArray)) {
-//                this.exitWithError("Not sorted");
-//            }
+            if (!this.testCorrectness(sortArray)) {
+                this.exitWithError("Not sorted");
+            }
             //this.printResults(sortArray, assignments, comparisons, "Quicksort");
         }
         //this.printResults(sortArray, assignments, comparisons, "Quicksort");
-        this.printResults(sortArray, assignments, comparisons, "Radix Sort");
+        this.printResults(sortArray, this.numRecords, assignments, comparisons, this.numIterations, sortType);
     }
 
     private Person[] deepCopy(Person[] copyArray, int start, int numRecords) {
@@ -222,43 +233,45 @@ class Sort {
     // TODO: remove this before turning in
     private boolean testCorrectness(Person[] sortedArray) {
         for (int i = 0; i < sortedArray.length - 1; i++) {
-            if (sortedArray[i].compareTo(sortedArray[i+1]) > 0) {
+            if (sortedArray[i].getCompareValue() > sortedArray[i+1].getCompareValue()) {
                 return false;
             }
         }
         return true;
     }
 
-    private void printResults(Person[] sortedArray, int arrayLength, int[] assignments, int[] comparisons, String sortTitle) {
-        System.out.println(sortTitle);
+    private void printResults(Person[] sortedArray, int sortedLength, int[] assignments, int[] comparisons, int dataLength, SortType sortType) {
+        System.out.println(sortType);
         System.out.println("- Sorted array");
 
-        this.printPeople(sortedArray);
+        this.printPeople(sortedArray, sortedLength);
 
         System.out.println();
 
         System.out.println("- Assignments");
-        this.printSortData(assignments);
+        this.printSortData(assignments, dataLength);
 
         System.out.println();
 
         System.out.println("- Comparisons");
-        this.printSortData(comparisons);
+        this.printSortData(comparisons, dataLength);
+        System.out.println();
+        System.out.println();
     }
 
-    private void printSortData(int[] data) {
-        for (int i = 0; i < data.length; i++)
+    private void printSortData(int[] data, int dataLength) {
+        for (int i = 0; i < dataLength; i++)
             System.out.print(data[i] + " ");
     }
 
-    private void printPeople(Person[] people) {
-        for (int i = 0; i < people.length; i++) {
+    private void printPeople(Person[] people, int peopleLength) {
+        for (int i = 0; i < peopleLength; i++) {
             System.out.println(people[i]);
         }
     }
 
-    public void quickSort(Person[] sortArray) {
-        this.quickSortRec(sortArray, 0, sortArray.length);
+    public void quickSort(Person[] sortArray, int length) {
+        this.quickSortRec(sortArray, 0, length);
     }
 
     private void quickSortRec(Person[] sortArray, int low, int high) {
@@ -282,7 +295,7 @@ class Sort {
         int i = low - 1;
         for (int j = low; j < (high - 1); j++) {
             this.numComparisons++;
-            if (sortArray[j].compareTo(pivot) <= 0) {
+            if (sortArray[j].getCompareValue() < pivot.getCompareValue()) {
                 i++;
                 //System.out.println(i + " " + j);
                 this.numAssignments += 2;
@@ -295,9 +308,10 @@ class Sort {
         return i;
     }
 
-    public void radixSort(Person[] sortArray, int arrayLength) {
-        int partitionLength = this.choosePartitionLength(arrayLength);
-        int firstStart = arrayLength - partitionLength - 1;
+    public Person[] radixSort(Person[] sortArray, int arrayLength) {
+        int partitionLength = this.getPartitionLength(arrayLength);
+        //System.out.println("partition length = " + partitionLength);
+        int firstStart =  Person.getCompareLength() - partitionLength;
         for (int start = firstStart; start >= (-1 * partitionLength + 1); start -= partitionLength) {
             int checkedStart;
             int end = start + partitionLength;
@@ -308,24 +322,32 @@ class Sort {
             else {
                 checkedStart = start;
             }
-            this.countingSort(sortArray, arrayLength, checkedStart, end);
+            sortArray = this.countingSort(sortArray, arrayLength, checkedStart, end);
         }
+        return sortArray;
     }
 
-    private int choosePartitionLength(int arraySize) {
+    private int getPartitionLength(int arraySize) {
         final double NUM_BITS = 32.0;
         double lgn = Math.floor(Math.log(arraySize) / Math.log(2));
         double partitionSize = (NUM_BITS < lgn) ? NUM_BITS : lgn;
-        int partitionLength = (int)Math.ceil(NUM_BITS / partitionSize);
-        if (partitionLength < 1) {
-            partitionLength = 1;
+        double numPasses = Math.ceil(NUM_BITS / partitionSize);
+
+        double compareLength = (double)Person.getCompareLength();
+
+        if (numPasses < 1.0) {
+            numPasses = 1.0;
         }
-        return partitionLength;
+        else if (numPasses > compareLength) {
+            numPasses = compareLength;
+        }
+        return (int)Math.ceil(compareLength / numPasses);
     }
 
     private Person[] countingSort(Person[] unsorted, int arrayLength, int start, int end) {
-        int maxValue = this.getMaxPersonValue(unsorted, start, arrayLength);
-        int[] helper = new int[maxValue + 1];
+        int maxValue = this.getMaxPersonValue(unsorted, arrayLength, start, end);
+        int helperLength = maxValue + 1;
+        int[] helper = new int[helperLength];
 
         Person[] sorted = new Person[arrayLength];
 
@@ -334,22 +356,21 @@ class Sort {
             helper[i] = 0;
         }
 
-        for (int i = 0; i < unsorted.length; i++) {
+        for (int i = 0; i < arrayLength; i++) {
             this.numAssignments++;
             helper[unsorted[i].getCompareValue(start, end)]++;
         }
 
-        for (int i = 1; i < helper.length; i++) {
+        for (int i = 1; i < helperLength; i++) {
             this.numAssignments++;
             helper[i] += helper[i - 1];
         }
 
-        for (int i = unsorted.length - 1; i >= 0; i--) {
+        for (int i = arrayLength - 1; i >= 0; i--) {
             Person p = unsorted[i];
             int value = p.getCompareValue(start, end);
             this.numAssignments++;
             //System.out.println(helper[value]);
-            //System.out.println(sorted.length);
             sorted[helper[value]-1] = p;
             this.numAssignments++;
             helper[value]--;
@@ -358,9 +379,9 @@ class Sort {
         return sorted;
     }
 
-    private int getMaxPersonValue(Person[] array, int start, int end) {
+    private int getMaxPersonValue(Person[] array, int arrayLength, int start, int end) {
         int maxValue = 0;
-        for (int i = 0; i < array.length; i++) {
+        for (int i = 0; i < arrayLength; i++) {
             int compareValue = array[i].getCompareValue(start, end);
             if (compareValue > maxValue) {
                 maxValue = compareValue;
