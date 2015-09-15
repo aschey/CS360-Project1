@@ -1,5 +1,4 @@
-import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.*;
 import java.util.*;
 
 /**
@@ -17,7 +16,7 @@ enum SortType {
 
     private final String text;
 
-    private SortType(final String text) {
+    SortType(final String text) {
         this.text = text;
     }
 
@@ -75,7 +74,6 @@ class Person {
     public int getCompareValue(int start, int end) {
         int intSlice = this.compareValue % (int)Math.pow(10, compareLength - start);
         intSlice /= (int)Math.pow(10, compareLength - end);
-        //System.out.println(this.compareValue + " " + start + " " + end + " " + intSlice);
         return intSlice;
     }
 
@@ -92,7 +90,7 @@ class Person {
         String month = this.birthDate.substring(0, 2);
         String day = this.birthDate.substring(2, 4);
         String year = this.birthDate.substring(4);
-        return month + "/" + day + "/" + year;
+        return String.join("/", month, day, year);
     }
 }
 
@@ -113,27 +111,14 @@ class Sort {
         System.exit(0);
     }
 
-    private int getArgsLength(String[] args) {
-        int length = 0;
-        while (true) {
-            try {
-                length++;
-                String s = args[length];
-            }
-            catch (ArrayIndexOutOfBoundsException ex) {
-                return length;
-            }
-        }
-    }
-
     private void swap(Person[] array, int swapIndex1, int swapIndex2) {
         Person temp = array[swapIndex1];
         array[swapIndex1] = array[swapIndex2];
         array[swapIndex2] = temp;
     }
 
-    private int indexOf(String[] array, String value, int arrayLength) {
-        for (int i = 0; i < arrayLength; i++) {
+    private int indexOf(String[] array, String value) {
+        for (int i = 0; i < array.length; i++) {
             if (array[i].equals(value)) {
                 return i;
             }
@@ -142,38 +127,83 @@ class Sort {
     }
 
     public void parseArgs(String[] args) {
-        int argsLength = this.getArgsLength(args);
-        if (this.indexOf(args, "-B", argsLength) > -1) {
+        int bIndex = this.indexOf(args, "-B");
+        int sIndex = this.indexOf(args, "-S");
+        if (bIndex > -1 && sIndex > -1) {
+            this.exitWithError("Cannot choose both -B and -S");
+        }
+
+        if (bIndex > -1) {
             Person.setCompareType(SortData.BIRTH_DATE);
         }
-        else if (this.indexOf(args, "-S", argsLength) > -1) {
+        else if (sIndex > -1) {
             Person.setCompareType(SortData.SSN);
         }
         else {
             this.exitWithError("Sort type not specified");
         }
 
-        int numIterationsIndex = this.indexOf(args, "-n", argsLength);
+        int numIterationsIndex = this.indexOf(args, "-n");
+
         if (numIterationsIndex < 0) {
             this.exitWithError("Number of iterations flag missing");
         }
-        if (numIterationsIndex == (argsLength - 1)) {
+        if (numIterationsIndex == (args.length - 1)) {
             this.exitWithError("Number of iterations value missing");
         }
-
+        int iterationsValueIndex = numIterationsIndex + 1;
         try {
-            this.numIterations = Integer.parseInt(args[numIterationsIndex + 1]);
+            this.numIterations = Integer.parseInt(args[iterationsValueIndex]);
         }
         catch (NumberFormatException ex) {
             this.exitWithError("Number of iterations value invalid");
+        }
+
+        if (args.length > 3) {
+            for (int i = 0; i < args.length; i++) {
+                if (i != bIndex && i != sIndex && i != numIterationsIndex && i != iterationsValueIndex) {
+                    this.exitWithError("Argument \"" + args[i] + "\" not recognized");
+                }
+            }
         }
     }
 
     public void readData(String[] args) {
         this.parseArgs(args);
+//        File f = new File("personnel.csv");
+//        try {
+//            BufferedReader br = new BufferedReader(new FileReader(f));
+//            try {
+//                br.readLine();
+//                this.numRecords = 341516255;
+//                this.unsortedData = new Person[this.numRecords];
+//                String line;
+//                int i = 0;
+//                while ((line = br.readLine()) != null) {
+//                    String[] l = line.split(",");
+//                    this.unsortedData[i] = new Person(l[0], l[1], l[2]);
+//                    i++;
+//                }
+//            }
+//            catch (IOException ex) {
+//                this.exitWithError("IOException");
+//            }
+//        }
+//        catch (FileNotFoundException ex) {
+//            this.exitWithError("File not found");
+//        }
+
+
         try (Scanner scan = new Scanner(new File("personnel.csv"))) {
             scan.useDelimiter(",|\n");
-            this.numRecords = scan.nextInt();
+            //scan.next();
+            try {
+                //this.numRecords = 341516255;
+                this.numRecords = scan.nextInt();
+            }
+            catch (NumberFormatException ex) {
+                this.exitWithError("Number of records not specified");
+            }
             this.unsortedData = new Person[this.numRecords];
             for (int i = 0; i < this.numRecords; i++) {
                 String name = scan.next();
@@ -216,9 +246,7 @@ class Sort {
             if (!this.testCorrectness(sortArray)) {
                 this.exitWithError("Not sorted");
             }
-            //this.printResults(sortArray, assignments, comparisons, "Quicksort");
         }
-        //this.printResults(sortArray, assignments, comparisons, "Quicksort");
         this.printResults(sortArray, this.numRecords, assignments, comparisons, this.numIterations, sortType);
     }
 
