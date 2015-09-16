@@ -1,3 +1,4 @@
+import javax.rmi.CORBA.Util;
 import java.io.*;
 import java.util.*;
 
@@ -30,7 +31,9 @@ public class Project1 {
 
     public static void main(String[] args) {
         Sort sort = new Sort();
+        // Parse command line args and read data file
         sort.readData(args);
+        // Run quicksort and radix sort
         sort.runSorts();
     }
 }
@@ -38,33 +41,37 @@ public class Project1 {
 class Person {
     private static final int BIRTHDAY_LENGTH = 8;
     private static final int SSN_LENGTH = 9;
+
     private static SortData compareType = SortData.BIRTH_DATE;
     private static int compareLength = BIRTHDAY_LENGTH;
-    public String lastName;
-    public String SSN;
-    public String birthDate;
+
+    private String lastName;
+    private String birthDate;
+    private String SSN;
+
     private int compareValue;
 
-    public Person(String lastName, String SSN, String birthDate) {
+    public Person(String lastName, String birthDate, String SSN) {
+        // Make sure strings are in the correct format
+        if (birthDate.contains("-") || birthDate.length() != Person.BIRTHDAY_LENGTH) {
+            Utilities.exitWithError("Data file contains invalid birth date");
+        }
+
+        if (!SSN.contains("-") || SSN.length() != Person.SSN_LENGTH) {
+            Utilities.exitWithError("Data file contains invalid SSN");
+        }
         this.lastName = lastName;
-        this.SSN = SSN;
         this.birthDate = birthDate;
-        if (Person.compareType == SortData.BIRTH_DATE) {
-            this.compareValue = Integer.parseInt(birthDate);
-        }
-        else {
-            this.compareValue = Integer.parseInt(SSN.replace("-", ""));
-        }
+        this.SSN = SSN;
+
+        // Store the value to sort with as an int for easier access
+        this.compareValue = (Person.compareType == SortData.BIRTH_DATE) ?
+            Integer.parseInt(birthDate) : Integer.parseInt(SSN.replace("-", ""));
     }
 
     public static void setCompareType(SortData compare) {
-        compareType = compare;
-        if (compare == SortData.BIRTH_DATE) {
-            compareLength = BIRTHDAY_LENGTH;
-        }
-        else {
-            compareLength = SSN_LENGTH;
-        }
+        Person.compareType = compare;
+        Person.compareLength = (compare == SortData.BIRTH_DATE) ? BIRTHDAY_LENGTH : SSN_LENGTH;
     }
 
     public static int getCompareLength() {
@@ -72,7 +79,9 @@ class Person {
     }
 
     public int getCompareValue(int start, int end) {
+        // Remove the portion from the beginning to "start"
         int intSlice = this.compareValue % (int)Math.pow(10, compareLength - start);
+        // Remove the portion from "end" to the end
         intSlice /= (int)Math.pow(10, compareLength - end);
         return intSlice;
     }
@@ -106,31 +115,12 @@ class Sort {
         this.numAssignments = 0;
     }
 
-    private void exitWithError(String errorMessage) {
-        System.out.println("Error: " + errorMessage);
-        System.exit(0);
-    }
-
-    private void swap(Person[] array, int swapIndex1, int swapIndex2) {
-        Person temp = array[swapIndex1];
-        array[swapIndex1] = array[swapIndex2];
-        array[swapIndex2] = temp;
-    }
-
-    private int indexOf(String[] array, String value) {
-        for (int i = 0; i < array.length; i++) {
-            if (array[i].equals(value)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
     public void parseArgs(String[] args) {
-        int bIndex = this.indexOf(args, "-B");
-        int sIndex = this.indexOf(args, "-S");
+        int bIndex = Utilities.indexOf(args, "-B");
+        int sIndex = Utilities.indexOf(args, "-S");
+
         if (bIndex > -1 && sIndex > -1) {
-            this.exitWithError("Cannot choose both -B and -S");
+            Utilities.exitWithError("Cannot choose both -B and -S");
         }
 
         if (bIndex > -1) {
@@ -140,29 +130,36 @@ class Sort {
             Person.setCompareType(SortData.SSN);
         }
         else {
-            this.exitWithError("Sort type not specified");
+            Utilities.exitWithError("Sort type not specified");
         }
 
-        int numIterationsIndex = this.indexOf(args, "-n");
+        int numIterationsIndex = Utilities.indexOf(args, "-n");
 
         if (numIterationsIndex < 0) {
-            this.exitWithError("Number of iterations flag missing");
+            Utilities.exitWithError("Number of iterations flag missing");
         }
+
+        // Value after -n must be missing if we're already at the end
         if (numIterationsIndex == (args.length - 1)) {
-            this.exitWithError("Number of iterations value missing");
+            Utilities.exitWithError("Number of iterations value missing");
         }
+
         int iterationsValueIndex = numIterationsIndex + 1;
         try {
             this.numIterations = Integer.parseInt(args[iterationsValueIndex]);
+            if (this.numIterations < 1) {
+                Utilities.exitWithError("Number of iterations must be a positive integer");
+            }
         }
         catch (NumberFormatException ex) {
-            this.exitWithError("Number of iterations value invalid");
+            Utilities.exitWithError("Number of iterations value invalid");
         }
 
+        // If there are more than 3 arguments, there must be an unnecessary one
         if (args.length > 3) {
             for (int i = 0; i < args.length; i++) {
                 if (i != bIndex && i != sIndex && i != numIterationsIndex && i != iterationsValueIndex) {
-                    this.exitWithError("Argument \"" + args[i] + "\" not recognized");
+                    Utilities.exitWithError("Argument \"" + args[i] + "\" not recognized");
                 }
             }
         }
@@ -195,26 +192,30 @@ class Sort {
 
 
         try (Scanner scan = new Scanner(new File("personnel.csv"))) {
-            scan.useDelimiter(",|\n");
-            //scan.next();
+            //scan.useDelimiter(",|\n");
             try {
-                //this.numRecords = 341516255;
                 this.numRecords = scan.nextInt();
             }
             catch (NumberFormatException ex) {
-                this.exitWithError("Number of records not specified");
+                Utilities.exitWithError("Number of records not specified");
             }
             this.unsortedData = new Person[this.numRecords];
-            for (int i = 0; i < this.numRecords; i++) {
-                String name = scan.next();
-                String SSN = scan.next();
-                String birthday = scan.next();
+            try {
+                for (int i = 0; i < this.numRecords; i++) {
+                    String[] line = scan.next().split(",");
+                    String name = line[0];
+                    String birthday = line[1];
+                    String SSN = line[2];
 
-                unsortedData[i] = new Person(name, SSN, birthday);
+                    unsortedData[i] = new Person(name, birthday, SSN);
+                }
+            }
+            catch (InputMismatchException | ArrayIndexOutOfBoundsException ex) {
+                Utilities.exitWithError("Malformed input file");
             }
         }
         catch (FileNotFoundException ex) {
-            this.exitWithError("CSV file not found");
+            Utilities.exitWithError("CSV file not found");
         }
     }
 
@@ -224,17 +225,20 @@ class Sort {
     }
 
     private void runSort(SortType sortType) {
-        int interval = this.numRecords / this.numIterations;
+        int interval = (int)Math.ceil((double)this.numRecords / this.numIterations);
         Person[] sortArray = new Person[interval];
         int[] comparisons = new int[this.numIterations];
         int[] assignments = new int[this.numIterations];
 
         int sortDataIndex = 0;
-        for (int currentNumRecords = interval; currentNumRecords <= this.numRecords; currentNumRecords += interval) {
+        for (int currentNumRecords = interval; currentNumRecords < (this.numRecords + interval); currentNumRecords += interval) {
+            if (currentNumRecords > this.numRecords) {
+                currentNumRecords = this.numRecords;
+            }
             this.numComparisons = 0;
             this.numAssignments = 0;
             sortArray = this.deepCopy(this.unsortedData, 0, currentNumRecords);
-            //System.out.println(Arrays.deepToString(sortArray));
+
             if (sortType == SortType.QUICKSORT) {
                 this.quickSort(sortArray, currentNumRecords);
             }
@@ -244,10 +248,16 @@ class Sort {
             comparisons[sortDataIndex] = this.numComparisons;
             assignments[sortDataIndex++] = this.numAssignments;
             if (!this.testCorrectness(sortArray)) {
-                this.exitWithError("Not sorted");
+                Utilities.exitWithError("Not sorted");
             }
         }
         this.printResults(sortArray, this.numRecords, assignments, comparisons, this.numIterations, sortType);
+    }
+
+    private void swap(Person[] array, int swapIndex1, int swapIndex2) {
+        Person temp = array[swapIndex1];
+        array[swapIndex1] = array[swapIndex2];
+        array[swapIndex2] = temp;
     }
 
     private Person[] deepCopy(Person[] copyArray, int start, int numRecords) {
@@ -298,7 +308,7 @@ class Sort {
         }
     }
 
-    public void quickSort(Person[] sortArray, int length) {
+    private void quickSort(Person[] sortArray, int length) {
         this.quickSortRec(sortArray, 0, length);
     }
 
@@ -336,7 +346,7 @@ class Sort {
         return i;
     }
 
-    public Person[] radixSort(Person[] sortArray, int arrayLength) {
+    private Person[] radixSort(Person[] sortArray, int arrayLength) {
         int partitionLength = this.getPartitionLength(arrayLength);
         //System.out.println("partition length = " + partitionLength);
         int firstStart =  Person.getCompareLength() - partitionLength;
@@ -417,6 +427,20 @@ class Sort {
         }
         return maxValue;
     }
+}
 
+class Utilities {
+    static void exitWithError(String errorMessage) {
+        System.out.println("Error: " + errorMessage);
+        System.exit(0);
+    }
 
+    static int indexOf(String[] array, String value) {
+        for (int i = 0; i < array.length; i++) {
+            if (array[i].equals(value)) {
+                return i;
+            }
+        }
+        return -1;
+    }
 }
