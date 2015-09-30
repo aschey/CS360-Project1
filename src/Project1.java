@@ -2,7 +2,10 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Created by aschey on 9/2/15.
+ * Austin Schey
+ * Project 1
+ * 09/17/2015
+ * CS 360
  */
 
 enum SortData {
@@ -86,6 +89,8 @@ class Person {
     public int getCompareValue(int start, int end) {
         /**
          * returns a "slice" of the compare value from start (inclusive) to end (exclusive)
+         * Note: "start" and "end" values do not depend on input size (they must be between
+         * 0 and 9), so this function has no effect on complexity
          */
         // Remove the portion from the beginning to "start"
         int intSlice = this.compareValue % (int)Math.pow(10, compareLength - start);
@@ -265,6 +270,7 @@ class Sort {
         // Keep track of which iteration we're on to store comparisons and assignments
         int sortDataIndex = 0;
         for (int currentNumRecords = interval; currentNumRecords < (this.numRecords + interval); currentNumRecords += interval) {
+            // Make sure we don't exceed the size of the array
             if (currentNumRecords > this.numRecords) {
                 currentNumRecords = this.numRecords;
             }
@@ -323,7 +329,7 @@ class Sort {
         /**
          * Prints the contents of the sorted array as well as the assignments and comparisons
          */
-        System.out.println(sortType);
+        System.out.println("* " + sortType);
         System.out.println("- Sorted array");
 
         this.printPeople(sortedArray, sortedLength);
